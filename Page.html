@@ -77,9 +77,21 @@ footer { text-align: center; font-size: 11px; color: var(--ink-light); padding: 
 
 <main>
 
+<?
+var FEE_ORDER = ['保育料','副食費','副食費(１ヶ月)','主食代','保護者会費',
+  '教材費','教材追加','教材費追加','追加購入','帽子購入',
+  '遠足代','月刊誌代','月刊誌'];
+function sortedKeys(feesObj) {
+  var keys = Object.keys(feesObj);
+  var ordered = [];
+  FEE_ORDER.forEach(function(k) { if (keys.indexOf(k) >= 0) ordered.push(k); });
+  keys.forEach(function(k) { if (ordered.indexOf(k) < 0) ordered.push(k); });
+  return ordered;
+}
+?>
+
   <!-- 子供情報 -->
   <div class="child-card">
-    <div class="child-avatar">👶</div>
     <div>
       <div class="child-name"><?= childInfo.name ?></div>
       <div class="child-sub">クラス：<?= childInfo.cls ?></div>
@@ -135,7 +147,7 @@ footer { text-align: center; font-size: 11px; color: var(--ink-light); padding: 
       </div>
     </div>
     <div class="invoice-body">
-      <? var fees = latestInvoice.fees; var feeKeys = Object.keys(fees); ?>
+      <? var fees = latestInvoice.fees; var feeKeys = sortedKeys(fees); ?>
       <? for (var i = 0; i < feeKeys.length; i++) { var key = feeKeys[i]; ?>
       <div class="fee-row">
         <span class="fee-name"><?= key ?></span>
@@ -179,7 +191,7 @@ footer { text-align: center; font-size: 11px; color: var(--ink-light); padding: 
           <?= fi.name ?>（<?= fi.cls ?>）
           <span style="float:right;color:var(--sage);">¥<?= Number(fi.total).toLocaleString() ?></span>
         </div>
-        <? var fkeys = Object.keys(fi.fees); for (var fk = 0; fk < fkeys.length; fk++) { ?>
+        <? var fkeys = sortedKeys(fi.fees); for (var fk = 0; fk < fkeys.length; fk++) { ?>
         <div class="fee-row" style="padding:4px 0;">
           <span class="fee-name" style="padding-left:8px;"><?= fkeys[fk] ?></span>
           <span class="fee-amount">¥<?= Number(fi.fees[fkeys[fk]]).toLocaleString() ?></span>
@@ -208,7 +220,7 @@ footer { text-align: center; font-size: 11px; color: var(--ink-light); padding: 
         <span class="history-total">¥<?= Number(inv.total).toLocaleString() ?></span>
       </div>
       <div class="history-detail" id="detail-<?= j ?>">
-        <? var hFees = inv.fees; var hKeys = Object.keys(hFees); ?>
+        <? var hFees = inv.fees; var hKeys = sortedKeys(hFees); ?>
         <? for (var k = 0; k < hKeys.length; k++) { var hKey = hKeys[k]; ?>
         <div class="history-fee-row">
           <span style="color:var(--ink-mid);"><?= hKey ?></span>
