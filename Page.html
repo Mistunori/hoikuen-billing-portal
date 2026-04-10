@@ -88,10 +88,31 @@ footer { text-align: center; font-size: 11px; color: var(--ink-light); padding: 
 
   <!-- 兄弟ナビゲーション -->
   <? if (siblings && siblings.length > 0) { ?>
-  <div style="background:white;border-radius:12px;border:1px solid var(--border);padding:14px 20px;margin-bottom:20px;">
-    <div style="font-size:12px;color:var(--ink-mid);margin-bottom:8px;font-weight:600;">👨‍👩‍👧 ご兄弟</div>
+  <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px;">
+    <button style="
+      background:var(--sage);
+      color:white;
+      border:2px solid var(--sage);
+      border-radius:24px;
+      padding:8px 20px;
+      font-size:13px;
+      font-weight:600;
+      font-family:inherit;
+      cursor:default;
+    "><?= childInfo.name ?>（<?= childInfo.cls ?>）</button>
     <? for (var s = 0; s < siblings.length; s++) { var sib = siblings[s]; ?>
-    <a href="<?= webAppUrl ?>?t=<?= sib.token ?>" style="display:inline-block;background:var(--sage-light);border:1px solid var(--sage-mid);border-radius:20px;padding:4px 14px;font-size:13px;color:var(--sage);text-decoration:none;margin:2px;"><?= sib.name ?>（<?= sib.cls ?>クラス）</a>
+    <a href="<?= webAppUrl ?>?t=<?= sib.token ?>" style="
+      display:inline-flex;
+      align-items:center;
+      background:white;
+      color:var(--sage);
+      border:2px solid var(--sage);
+      border-radius:24px;
+      padding:8px 20px;
+      font-size:13px;
+      font-weight:600;
+      text-decoration:none;
+    "><?= sib.name ?>（<?= sib.cls ?>）</a>
     <? } ?>
   </div>
   <? } ?>
