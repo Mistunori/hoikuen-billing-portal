@@ -292,9 +292,12 @@ function doGet(e) {
       // 最新月の全兄弟の請求を取得
       var latestMonth = invoices.length > 0 ? String(invoices[0].month) : '';
       if (latestMonth) {
+        var addedIds = [];
         for (var i = histData.length - 1; i >= 1; i--) {
           var hid = String(histData[i][1]);
-          if (familyIds.indexOf(hid) >= 0 && String(histData[i][0]) === latestMonth) {
+          if (familyIds.indexOf(hid) >= 0
+              && String(histData[i][0]) === latestMonth
+              && addedIds.indexOf(hid) < 0) {
             var hfees = {};
             try { hfees = JSON.parse(histData[i][5] || '{}'); } catch(e) {}
             var htotal = histData[i][6];
@@ -305,6 +308,7 @@ function doGet(e) {
               fees: hfees,
               total: htotal
             });
+            addedIds.push(hid);
           }
         }
       }
