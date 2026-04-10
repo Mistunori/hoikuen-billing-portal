@@ -15,6 +15,7 @@ function onOpen() {
     .addItem('📂 xlsmを取込む', 'showImportDialog')
     .addSeparator()
     .addItem('🔗 保護者ページURL一覧', 'showUrls')
+    .addItem('📄 QRコード配布用ドキュメント生成', 'generateHandoutDoc')
     .addSeparator()
     .addItem('⚙️ 初期設定（初回のみ）', 'setup')
     .addSeparator()
@@ -308,6 +309,113 @@ function resetMasterData() {
     if (lastRow > 1) master.deleteRows(2, lastRow - 1);
     ui.alert('✅ マスタデータを削除しました。xlsmを再取込みしてください。');
   }
+}
+
+// ===================================================
+// QRコード配布用ドキュメント生成
+// ===================================================
+function generateHandoutDoc() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var master = ss.getSheetByName('マスタ');
+  var settings = ss.getSheetByName('設定');
+  if (!master) { SpreadsheetApp.getUi().alert('マスタデータがありません'); return; }
+
+  var gardenName = settings ? settings.getRange('B1').getValue() : '保育園';
+  var webAppUrl = getWebAppUrl();
+  var data = master.getDataRange().getValues();
+
+  SpreadsheetApp.getUi().alert('ドキュメントを生成します。件数によって数分かかります。');
+
+  var doc = DocumentApp.create('QRコード配布用_' + gardenName);
+  var body = doc.getBody();
+  body.clear();
+  body.setMarginTop(40).setMarginBottom(40).setMarginLeft(60).setMarginRight(60);
+
+  var style = {};
+  style[DocumentApp.Attribute.FONT_SIZE] = 11;
+  style[DocumentApp.Attribute.BOLD] = false;
+
+  var first = true;
+  for (var i = 1; i < data.length; i++) {
+    var row = data[i];
+    if (!row[0]) continue;
+
+    var childName = String(row[2]);
+    var className = String(row[3]);
+    var token = String(row[5]);
+    var qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data='
+      + encodeURIComponent(webAppUrl + '?t=' + token);
+
+    if (!first) body.appendPageBreak();
+    first = false;
+
+    // タイトル
+    var title = body.appendParagraph('保育料 閲覧用QRコードのお知らせ');
+    title.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
+    title.editAsText().setFontSize(16).setBold(true);
+
+    body.appendParagraph('').setAttributes(style);
+
+    // 宛名
+    var namePara = body.appendParagraph(childName + '　（クラス：' + className + '）');
+    namePara.editAsText().setFontSize(13).setBold(true);
+
+    body.appendParagraph('').setAttributes(style);
+
+    // 説明
+    body.appendParagraph('毎月の保育料・集金内訳をスマートフォンからご確認いただけます。').setAttributes(style);
+    body.appendParagraph('下記のQRコードを読み取ってアクセスしてください。').setAttributes(style);
+
+    body.appendParagraph('').setAttributes(style);
+
+    // QRコード画像
+    try {
+      var blob = UrlFetchApp.fetch(qrUrl).getBlob().setName('qr.png');
+      var img = body.appendImage(blob);
+      img.setWidth(180).setHeight(180);
+      img.getParent().setAlignment(DocumentApp.HorizontalAlignment.CENTER);
+    } catch(e) {
+      body.appendParagraph('[QRコード生成エラー]').setAttributes(style);
+    }
+
+    body.appendParagraph('').setAttributes(style);
+
+    // 確認できる内容
+    body.appendParagraph('【確認できる内容】').editAsText().setFontSize(11).setBold(true);
+    ['今月の集金額・費用内訳','口座引き落とし日','園からのお知らせ','過去の請求履歴'].forEach(function(t) {
+      body.appendParagraph('・' + t).setAttributes(style);
+    });
+
+    body.appendParagraph('').setAttributes(style);
+
+    // 保存方法
+    body.appendParagraph('【保存方法】').editAsText().setFontSize(11).setBold(true);
+    body.appendParagraph('ブラウザの「お気に入り（ブックマーク）」登録や「ホーム画面に追加」をしておくと次回から簡単に開けます。').setAttributes(style);
+
+    body.appendParagraph('').setAttributes(style);
+
+    // 兄弟
+    body.appendParagraph('【兄弟・姉妹がいるご家庭へ】').editAsText().setFontSize(11).setBold(true);
+    body.appendParagraph('画面上部のお子さんの名前ボタンを押すとその場でお子さん同士のページを切り替えて閲覧できます。どのQRコードから入っても兄弟の情報はすべて確認可能です。').setAttributes(style);
+
+    body.appendParagraph('').setAttributes(style);
+
+    // 画面表示について
+    body.appendParagraph('【画面上部の表示について】').editAsText().setFontSize(11).setBold(true);
+    body.appendParagraph('「このアプリケーションはGoogle Apps Scriptのユーザーによって…」という表示が出ますが右側の「×」で閉じてそのままお使いください。データは園で厳重に管理しておりますのでご安心ください。').setAttributes(style);
+
+    body.appendParagraph('').setAttributes(style);
+
+    // 署名
+    var sign = body.appendParagraph(gardenName + ' 事務局');
+    sign.setAlignment(DocumentApp.HorizontalAlignment.RIGHT);
+    sign.editAsText().setFontSize(10).setBold(false);
+  }
+
+  doc.saveAndClose();
+
+  var url = 'https://docs.google.com/document/d/' + doc.getId() + '/edit';
+  SpreadsheetApp.getUi().alert('✅ 完了！\n\nGoogleドライブに保存されました。\n以下のURLから開いてPDFでダウンロードしてください。\n\n' + url);
 }
 
 // ===================================================
