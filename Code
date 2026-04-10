@@ -165,7 +165,7 @@ function showUrls() {
   var master = ss.getSheetByName(SHEET_MASTER);
   if (!master) { SpreadsheetApp.getUi().alert('先にデータを取込んでください'); return; }
 
-  var webAppUrl = ScriptApp.getService().getUrl();
+  var webAppUrl = getWebAppUrl();
   var data = master.getDataRange().getValues();
 
   var html = '<style>body{font-family:sans-serif;font-size:12px;padding:10px;}';
@@ -266,4 +266,11 @@ function doGet(e) {
 
 function errorPage(msg) {
   return '<html><body style="font-family:sans-serif;padding:40px;text-align:center;"><h2>⚠️ ' + msg + '</h2></body></html>';
+}
+
+// ===================================================
+// WebアプリURL取得
+// ===================================================
+function getWebAppUrl() {
+  return 'https://script.google.com/macros/s/AKfycbwvDVTeDKg1jcbKz-feKiNGDngrpuGswVkvZrj1e3n45Goj9TNAsZWHUmhATih3xy98ww/exec';
 }
