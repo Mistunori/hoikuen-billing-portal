@@ -201,6 +201,7 @@ function showUrls() {
 // 保護者向けWebページ（doGet）
 // ===================================================
 function doGet(e) {
+  Logger.log('doGet called with params: ' + JSON.stringify(e && e.parameter));
   var token = e && e.parameter && e.parameter.t;
 
   if (!token) {
@@ -231,6 +232,10 @@ function doGet(e) {
       }
     }
 
+    if (!childInfo) {
+      return HtmlService.createHtmlOutput(errorPage('ページが見つかりません'));
+    }
+
     // 兄弟を取得
     var siblings = [];
     if (siblingGroupId) {
@@ -239,10 +244,6 @@ function doGet(e) {
           siblings.push({ name: masterData[i][2], cls: masterData[i][3], token: String(masterData[i][5]) });
         }
       }
-    }
-
-    if (!childInfo) {
-      return HtmlService.createHtmlOutput(errorPage('ページが見つかりません'));
     }
 
     // 請求履歴を取得（新しい順）
@@ -277,7 +278,8 @@ function doGet(e) {
 
     return template.evaluate()
       .setTitle(gardenName + ' | 保護者ページ')
-      .addMetaTag('viewport', 'width=device-width, initial-scale=1.0');
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1.0')
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 
   } catch(e) {
     return HtmlService.createHtmlOutput(errorPage('エラーが発生しました: ' + e.message));
