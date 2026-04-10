@@ -81,10 +81,20 @@ footer { text-align: center; font-size: 11px; color: var(--ink-light); padding: 
   <div class="child-card">
     <div class="child-avatar">👶</div>
     <div>
-      <div class="child-name"><?= childInfo.guardianName ?></div>
-      <div class="child-sub"><?= childInfo.name ?> ｜ <?= childInfo.cls ?>クラス</div>
+      <div class="child-name"><?= childInfo.name ?></div>
+      <div class="child-sub"><?= childInfo.cls ?>クラス</div>
     </div>
   </div>
+
+  <!-- 兄弟ナビゲーション -->
+  <? if (siblings && siblings.length > 0) { ?>
+  <div style="background:white;border-radius:12px;border:1px solid var(--border);padding:14px 20px;margin-bottom:20px;">
+    <div style="font-size:12px;color:var(--ink-mid);margin-bottom:8px;font-weight:600;">👨‍👩‍👧 ご兄弟</div>
+    <? for (var s = 0; s < siblings.length; s++) { var sib = siblings[s]; ?>
+    <a href="?t=<?= sib.token ?>" style="display:inline-block;background:var(--sage-light);border:1px solid var(--sage-mid);border-radius:20px;padding:4px 14px;font-size:13px;color:var(--sage);text-decoration:none;margin:2px;"><?= sib.name ?>（<?= sib.cls ?>クラス）</a>
+    <? } ?>
+  </div>
+  <? } ?>
 
   <!-- 今月の請求 -->
   <? if (latestInvoice) { ?>

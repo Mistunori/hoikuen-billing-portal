@@ -30,10 +30,12 @@ function setup() {
   // マスタシート作成
   if (!ss.getSheetByName(SHEET_MASTER)) {
     var m = ss.insertSheet(SHEET_MASTER);
-    m.getRange(1, 1, 1, 6).setValues([['園児ID', '保護者名', '園児名', 'クラス', 'トークン', '登録日']]);
-    m.getRange(1, 1, 1, 6).setFontWeight('bold').setBackground('#e8f0ec');
+    m.getRange(1, 1, 1, 9).setValues([['園児ID', '保護者名', '園児名', 'クラス', '兄弟グループID', 'トークン', '登録日', '専用URL', 'QRコードURL']]);
+    m.getRange(1, 1, 1, 9).setFontWeight('bold').setBackground('#e8f0ec');
     m.setFrozenRows(1);
-    m.setColumnWidth(5, 160);
+    m.setColumnWidth(6, 160);
+    m.setColumnWidth(8, 300);
+    m.setColumnWidth(9, 300);
   }
 
   // 請求履歴シート作成
@@ -87,7 +89,7 @@ function processImportedData(params) {
     var masterMap = {};
     for (var i = 1; i < masterData.length; i++) {
       var r = masterData[i];
-      if (r[0]) masterMap[String(r[0])] = { rowIndex: i + 1, token: String(r[4]) };
+      if (r[0]) masterMap[String(r[0])] = { rowIndex: i + 1, token: String(r[5]) };
     }
 
     var newMasterRows = [];
@@ -104,7 +106,9 @@ function processImportedData(params) {
           token = masterMap[idStr].token;
         } else {
           token = generateToken();
-          newMasterRows.push([child.id, child.guardianName, child.name, cls.name, token, new Date()]);
+          var specialUrl = getWebAppUrl() + '?t=' + token;
+          var qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(specialUrl);
+          newMasterRows.push([child.id, child.guardianName, child.name, cls.name, '', token, new Date(), specialUrl, qrUrl]);
           masterMap[idStr] = { token: token };
         }
 
@@ -130,7 +134,7 @@ function processImportedData(params) {
 
     // マスタに新規追加
     if (newMasterRows.length > 0) {
-      master.getRange(master.getLastRow() + 1, 1, newMasterRows.length, 6).setValues(newMasterRows);
+      master.getRange(master.getLastRow() + 1, 1, newMasterRows.length, 9).setValues(newMasterRows);
     }
 
     // 履歴に追加
@@ -174,14 +178,16 @@ function showUrls() {
   html += 'th{background:#e8f0ec;font-weight:bold;}';
   html += 'a{color:#5a7a6a;}</style>';
   html += '<p style="font-size:11px;color:#888;">このURLを印刷して保護者に渡してください</p>';
-  html += '<table><tr><th>保護者名</th><th>園児名</th><th>クラス</th><th>専用URL</th></tr>';
+  html += '<table><tr><th>保護者名</th><th>園児名</th><th>クラス</th><th>専用URL</th><th>QRコード</th></tr>';
 
   for (var i = 1; i < data.length; i++) {
     var row = data[i];
     if (!row[0]) continue;
-    var url = webAppUrl + '?t=' + row[4];
+    var url = webAppUrl + '?t=' + row[5];
+    var qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(url);
     html += '<tr><td>' + row[1] + '</td><td>' + row[2] + '</td><td>' + row[3] + '</td>';
-    html += '<td><a href="' + url + '" target="_blank">ページを開く</a></td></tr>';
+    html += '<td><a href="' + url + '" target="_blank">ページを開く</a></td>';
+    html += '<td><img src="' + qrUrl + '" width="80"></td></tr>';
   }
   html += '</table>';
 
@@ -211,8 +217,10 @@ function doGet(e) {
     // トークンから園児を特定
     var masterData = master.getDataRange().getValues();
     var childInfo = null;
+    var siblingGroupId = '';
     for (var i = 1; i < masterData.length; i++) {
-      if (String(masterData[i][4]) === token) {
+      if (String(masterData[i][5]) === token) {
+        siblingGroupId = masterData[i][4];
         childInfo = {
           id:           masterData[i][0],
           guardianName: masterData[i][1],
@@ -220,6 +228,16 @@ function doGet(e) {
           cls:          masterData[i][3]
         };
         break;
+      }
+    }
+
+    // 兄弟を取得
+    var siblings = [];
+    if (siblingGroupId) {
+      for (var i = 1; i < masterData.length; i++) {
+        if (String(masterData[i][4]) === String(siblingGroupId) && String(masterData[i][0]) !== String(childInfo.id)) {
+          siblings.push({ name: masterData[i][2], cls: masterData[i][3], token: String(masterData[i][5]) });
+        }
       }
     }
 
@@ -254,6 +272,7 @@ function doGet(e) {
     template.gardenName    = gardenName;
     template.staffName     = staffName;
     template.latestInvoice = latestInvoice;
+    template.siblings      = siblings;
 
     return template.evaluate()
       .setTitle(gardenName + ' | 保護者ページ')
