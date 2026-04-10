@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif; padding: 20px; font-size: 14px; color: #1a1f1c; background: #faf8f4; }
+.field { margin-bottom: 14px; }
+label { display: block; font-size: 12px; font-weight: bold; color: #4a5450; margin-bottom: 5px; }
+input[type="text"], textarea {
+  width: 100%; padding: 9px 12px; border: 1px solid #dde5e0; border-radius: 8px;
+  font-family: inherit; font-size: 13px; color: #1a1f1c; background: white; outline: none;
+}
+input[type="text"]:focus, textarea:focus { border-color: #5a7a6a; }
+textarea { height: 60px; resize: vertical; }
+.upload-zone {
+  border: 2px dashed #b8cfc4; border-radius: 10px; padding: 24px;
+  text-align: center; cursor: pointer; background: #e8f0ec; transition: all 0.15s;
+}
+.upload-zone:hover, .upload-zone.over { border-color: #5a7a6a; background: #dceae2; }
+.upload-zone p { color: #4a5450; font-size: 13px; margin-top: 6px; }
+.upload-zone span { font-size: 24px; }
+#fileInput { display: none; }
+.btn {
+  background: #5a7a6a; color: white; border: none; padding: 12px 24px;
+  border-radius: 8px; font-size: 14px; font-weight: bold; font-family: inherit;
+  cursor: pointer; width: 100%; margin-top: 4px;
+}
+.btn:disabled { background: #b8cfc4; cursor: not-allowed; }
+.status { margin-top: 12px; font-size: 13px; padding: 10px 14px; border-radius: 8px; display: none; }
+.status.info    { background: #e8f0ec; color: #5a7a6a; display: block; }
+.status.error   { background: #fdf0ee; color: #c0392b; display: block; }
+.status.success { background: #eaf4ef; color: #2e7d52; display: block; font-weight: bold; }
+</style>
+</head>
+<body>
+
+<div class="field">
+  <label>📂 xlsmファイルを選択</label>
+  <div class="upload-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+    <span>📋</span>
+    <p id="fileLabel">クリックまたはドラッグ＆ドロップ</p>
+    <input type="file" id="fileInput" accept=".xlsm,.xlsx">
+  </div>
+</div>
+
+<div class="field">
+  <label>請求月</label>
+  <input type="text" id="invoiceMonth" placeholder="例: 2026年4月">
+</div>
+
+<div class="field">
+  <label>口座引き落とし日</label>
+  <input type="text" id="debitDate" placeholder="例: 2026年4月27日（月）">
+</div>
+
+<div class="field">
+  <label>今月のお知らせ（任意）</label>
+  <textarea id="notice" placeholder="例: 5月の遠足代は来月請求いたします。"></textarea>
+</div>
+
+<button class="btn" id="importBtn" onclick="startImport()">取込む</button>
+<div class="status" id="status"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script>
+var selectedFile = null;
+var TARGET_SHEETS = ['ラズベリー', 'ベリー', 'ポピー', 'ミント', 'ミモザ', 'オリーブ'];
+
+var dropZone = document.getElementById('dropZone');
+var fileInput = document.getElementById('fileInput');
+
+dropZone.addEventListener('dragover', function(e) { e.preventDefault(); dropZone.classList.add('over'); });
+dropZone.addEventListener('dragleave', function() { dropZone.classList.remove('over'); });
+dropZone.addEventListener('drop', function(e) {
+  e.preventDefault(); dropZone.classList.remove('over');
+  if (e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', function() { if (fileInput.files[0]) setFile(fileInput.files[0]); });
+
+function setFile(file) {
+  selectedFile = file;
+  document.getElementById('fileLabel').textContent = '✅ ' + file.name;
+}
+
+function startImport() {
+  if (!selectedFile) { showStatus('ファイルを選択してください', 'error'); return; }
+  var month = document.getElementById('invoiceMonth').value.trim();
+  var debit = document.getElementById('debitDate').value.trim();
+  var notice = document.getElementById('notice').value.trim();
+  if (!month || !debit) { showStatus('請求月と引き落とし日を入力してください', 'error'); return; }
+
+  document.getElementById('importBtn').disabled = true;
+  showStatus('ファイルを読み込み中...', 'info');
+
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var data = new Uint8Array(e.target.result);
+      var wb = XLSX.read(data, { type: 'array' });
+      var classes = [];
+
+      wb.SheetNames.forEach(function(sheetName) {
+        if (TARGET_SHEETS.indexOf(sheetName) < 0) return;
+        var ws = wb.Sheets[sheetName];
+        var rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
+        if (rows.length < 3) return;
+
+        var headers = rows[1];
+        var nameIdx = headers.indexOf('名前');
+        var totalIdx = headers.indexOf('集金額');
+        if (nameIdx < 0 || totalIdx < 0) return;
+
+        // 費用列のインデックスを取得
+        var feeIdxs = [];
+        headers.forEach(function(h, i) {
+          if (h && h !== '名前' && h !== '集金額' && i > 0) {
+            feeIdxs.push({ name: h, idx: i });
+          }
+        });
+
+        var children = [];
+        for (var i = 2; i < rows.length; i++) {
+          var row = rows[i];
+          // 有効な園児行の条件: ID列が数値、名前があり、集金額が正数
+          if (typeof row[0] !== 'number' || !row[nameIdx]) continue;
+          var total = row[totalIdx];
+          if (!total || typeof total !== 'number' || total <= 0) continue;
+
+          var rawName = String(row[nameIdx]).replace(/^●/, '').trim();
+          var guardianName = extractSurname(rawName) + ' 様';
+
+          var fees = {};
+          feeIdxs.forEach(function(f) {
+            var v = row[f.idx];
+            if (v && typeof v === 'number' && v > 0) fees[f.name] = v;
+          });
+
+          children.push({ id: row[0], name: rawName, guardianName: guardianName, fees: fees, total: total });
+        }
+
+        if (children.length > 0) classes.push({ name: sheetName, children: children });
+      });
+
+      if (classes.length === 0) {
+        showStatus('有効なデータが見つかりませんでした', 'error');
+        document.getElementById('importBtn').disabled = false;
+        return;
+      }
+
+      var total = classes.reduce(function(s, c) { return s + c.children.length; }, 0);
+      showStatus(total + '件のデータをスプレッドシートに保存中...', 'info');
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            showStatus('✅ 完了！ ' + result.count + '件を登録しました（新規園児: ' + result.newCount + '件）', 'success');
+          } else {
+            showStatus('エラー: ' + result.error, 'error');
+          }
+          document.getElementById('importBtn').disabled = false;
+        })
+        .withFailureHandler(function(err) {
+          showStatus('エラー: ' + (err.message || err), 'error');
+          document.getElementById('importBtn').disabled = false;
+        })
+        .processImportedData({
+          invoiceMonth: month,
+          debitDate: debit,
+          notice: notice,
+          classes: classes
+        });
+
+    } catch(err) {
+      showStatus('ファイルの解析に失敗: ' + err.message, 'error');
+      document.getElementById('importBtn').disabled = false;
+    }
+  };
+  reader.onerror = function() { showStatus('ファイルの読み込みに失敗しました', 'error'); document.getElementById('importBtn').disabled = false; };
+  reader.readAsArrayBuffer(selectedFile);
+}
+
+function extractSurname(name) {
+  if (name.indexOf('　') >= 0) return name.split('　')[0];
+  for (var i = 0; i < name.length; i++) {
+    var code = name.charCodeAt(i);
+    if (code >= 0x3041 && code <= 0x3096) return i > 0 ? name.slice(0, i) : name;
+  }
+  return name;
+}
+
+function showStatus(msg, type) {
+  var el = document.getElementById('status');
+  el.textContent = msg;
+  el.className = 'status ' + type;
+}
+</script>
+</body>
+</html>
