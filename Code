@@ -264,6 +264,45 @@ function doGet(e) {
       }
     }
 
+    // 兄弟合算データを取得
+    var familyTotal = 0;
+    var familyInvoices = [];
+
+    if (siblingGroupId) {
+      // 自分を含む全兄弟のIDを取得
+      var familyIds = [String(childInfo.id)];
+      var familyNames = {};
+      familyNames[String(childInfo.id)] = { name: childInfo.name, cls: childInfo.cls };
+
+      for (var i = 1; i < masterData.length; i++) {
+        if (String(masterData[i][4]) === String(siblingGroupId)) {
+          var fid = String(masterData[i][0]);
+          familyIds.push(fid);
+          familyNames[fid] = { name: masterData[i][2], cls: masterData[i][3] };
+        }
+      }
+
+      // 最新月の全兄弟の請求を取得
+      var latestMonth = invoices.length > 0 ? String(invoices[0].month) : '';
+      if (latestMonth) {
+        for (var i = histData.length - 1; i >= 1; i--) {
+          var hid = String(histData[i][1]);
+          if (familyIds.indexOf(hid) >= 0 && String(histData[i][0]) === latestMonth) {
+            var hfees = {};
+            try { hfees = JSON.parse(histData[i][5] || '{}'); } catch(e) {}
+            var htotal = histData[i][6];
+            familyTotal += Number(htotal) || 0;
+            familyInvoices.push({
+              name: familyNames[hid] ? familyNames[hid].name : hid,
+              cls: familyNames[hid] ? familyNames[hid].cls : '',
+              fees: hfees,
+              total: htotal
+            });
+          }
+        }
+      }
+    }
+
     var gardenName  = settings ? settings.getRange('B1').getValue() : '保育園';
     var staffName   = settings ? settings.getRange('B2').getValue() : '';
     var latestInvoice = invoices[0] || null;
@@ -276,6 +315,8 @@ function doGet(e) {
     template.latestInvoice = latestInvoice;
     template.siblings      = siblings;
     template.webAppUrl     = getWebAppUrl();
+    template.familyTotal   = familyTotal;
+    template.familyInvoices = familyInvoices;
 
     return template.evaluate()
       .setTitle(gardenName + ' | 保護者ページ')
