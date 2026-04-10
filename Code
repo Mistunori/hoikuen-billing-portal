@@ -273,6 +273,7 @@ function doGet(e) {
     template.staffName     = staffName;
     template.latestInvoice = latestInvoice;
     template.siblings      = siblings;
+    template.webAppUrl     = getWebAppUrl();
 
     return template.evaluate()
       .setTitle(gardenName + ' | 保護者ページ')
