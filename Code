@@ -109,7 +109,7 @@ function processImportedData(params) {
         }
 
         newHistoryRows.push([
-          params.invoiceMonth,
+          String(params.invoiceMonth),
           child.id,
           child.guardianName,
           child.name,
@@ -125,7 +125,7 @@ function processImportedData(params) {
     // 同月データを削除（上書き更新）
     var hData = history.getDataRange().getValues();
     for (var i = hData.length - 1; i >= 1; i--) {
-      if (hData[i][0] === params.invoiceMonth) history.deleteRow(i + 1);
+      if (String(hData[i][0]) === String(params.invoiceMonth)) history.deleteRow(i + 1);
     }
 
     // マスタに新規追加
