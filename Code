@@ -1,0 +1,269 @@
+// ===================================================
+// 保育園 請求管理システム - Code.gs
+// ===================================================
+
+var SHEET_MASTER  = 'マスタ';
+var SHEET_HISTORY = '請求履歴';
+var SHEET_SETTINGS = '設定';
+
+// ===================================================
+// メニュー追加
+// ===================================================
+function onOpen() {
+  SpreadsheetApp.getUi()
+    .createMenu('🌿 請求管理')
+    .addItem('📂 xlsmを取込む', 'showImportDialog')
+    .addSeparator()
+    .addItem('🔗 保護者ページURL一覧', 'showUrls')
+    .addSeparator()
+    .addItem('⚙️ 初期設定（初回のみ）', 'setup')
+    .addToUi();
+}
+
+// ===================================================
+// 初期設定（初回のみ実行）
+// ===================================================
+function setup() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  PropertiesService.getScriptProperties().setProperty('SPREADSHEET_ID', ss.getId());
+
+  // マスタシート作成
+  if (!ss.getSheetByName(SHEET_MASTER)) {
+    var m = ss.insertSheet(SHEET_MASTER);
+    m.getRange(1, 1, 1, 6).setValues([['園児ID', '保護者名', '園児名', 'クラス', 'トークン', '登録日']]);
+    m.getRange(1, 1, 1, 6).setFontWeight('bold').setBackground('#e8f0ec');
+    m.setFrozenRows(1);
+    m.setColumnWidth(5, 160);
+  }
+
+  // 請求履歴シート作成
+  if (!ss.getSheetByName(SHEET_HISTORY)) {
+    var h = ss.insertSheet(SHEET_HISTORY);
+    h.getRange(1, 1, 1, 9).setValues([['年月', '園児ID', '保護者名', '園児名', 'クラス', '費用詳細(JSON)', '合計金額', '引き落とし日', 'お知らせ']]);
+    h.getRange(1, 1, 1, 9).setFontWeight('bold').setBackground('#e8f0ec');
+    h.setFrozenRows(1);
+    h.setColumnWidth(6, 300);
+  }
+
+  // 設定シート作成
+  if (!ss.getSheetByName(SHEET_SETTINGS)) {
+    var s = ss.insertSheet(SHEET_SETTINGS);
+    s.getRange('A1:B3').setValues([
+      ['保育園名', 'リトルガーデンしいのみ'],
+      ['担当者名', '本木'],
+      ['備考', '']
+    ]);
+    s.getRange('A1:A3').setFontWeight('bold');
+  }
+
+  SpreadsheetApp.getUi().alert('✅ 初期設定が完了しました！\n\n次に：\n1. 設定シートで保育園名・担当者名を確認\n2. このスクリプトをウェブアプリとして公開\n（拡張機能→Apps Script→デプロイ→新しいデプロイ）');
+}
+
+// ===================================================
+// 取込ダイアログ表示
+// ===================================================
+function showImportDialog() {
+  var html = HtmlService.createHtmlOutputFromFile('ImportDialog')
+    .setWidth(520)
+    .setHeight(500);
+  SpreadsheetApp.getUi().showModalDialog(html, '📂 月次データ取込');
+}
+
+// ===================================================
+// データ処理（ダイアログから呼ばれる）
+// ===================================================
+function processImportedData(params) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var master  = ss.getSheetByName(SHEET_MASTER);
+    var history = ss.getSheetByName(SHEET_HISTORY);
+
+    if (!master || !history) {
+      return { success: false, error: '初期設定が完了していません。「⚙️ 初期設定」を実行してください。' };
+    }
+
+    // マスタを読み込みマップ化
+    var masterData = master.getDataRange().getValues();
+    var masterMap = {};
+    for (var i = 1; i < masterData.length; i++) {
+      var r = masterData[i];
+      if (r[0]) masterMap[String(r[0])] = { rowIndex: i + 1, token: String(r[4]) };
+    }
+
+    var newMasterRows = [];
+    var newHistoryRows = [];
+
+    for (var c = 0; c < params.classes.length; c++) {
+      var cls = params.classes[c];
+      for (var ch = 0; ch < cls.children.length; ch++) {
+        var child = cls.children[ch];
+        var idStr = String(child.id);
+
+        var token;
+        if (masterMap[idStr]) {
+          token = masterMap[idStr].token;
+        } else {
+          token = generateToken();
+          newMasterRows.push([child.id, child.guardianName, child.name, cls.name, token, new Date()]);
+          masterMap[idStr] = { token: token };
+        }
+
+        newHistoryRows.push([
+          params.invoiceMonth,
+          child.id,
+          child.guardianName,
+          child.name,
+          cls.name,
+          JSON.stringify(child.fees),
+          child.total,
+          params.debitDate,
+          params.notice || ''
+        ]);
+      }
+    }
+
+    // 同月データを削除（上書き更新）
+    var hData = history.getDataRange().getValues();
+    for (var i = hData.length - 1; i >= 1; i--) {
+      if (hData[i][0] === params.invoiceMonth) history.deleteRow(i + 1);
+    }
+
+    // マスタに新規追加
+    if (newMasterRows.length > 0) {
+      master.getRange(master.getLastRow() + 1, 1, newMasterRows.length, 6).setValues(newMasterRows);
+    }
+
+    // 履歴に追加
+    if (newHistoryRows.length > 0) {
+      history.getRange(history.getLastRow() + 1, 1, newHistoryRows.length, 9).setValues(newHistoryRows);
+    }
+
+    return { success: true, count: newHistoryRows.length, newCount: newMasterRows.length };
+
+  } catch(e) {
+    return { success: false, error: e.message };
+  }
+}
+
+// ===================================================
+// トークン生成
+// ===================================================
+function generateToken() {
+  var chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  var token = '';
+  for (var i = 0; i < 14; i++) {
+    token += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return token;
+}
+
+// ===================================================
+// URL一覧を表示
+// ===================================================
+function showUrls() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var master = ss.getSheetByName(SHEET_MASTER);
+  if (!master) { SpreadsheetApp.getUi().alert('先にデータを取込んでください'); return; }
+
+  var webAppUrl = ScriptApp.getService().getUrl();
+  var data = master.getDataRange().getValues();
+
+  var html = '<style>body{font-family:sans-serif;font-size:12px;padding:10px;}';
+  html += 'table{border-collapse:collapse;width:100%;}';
+  html += 'th,td{border:1px solid #ddd;padding:6px 8px;}';
+  html += 'th{background:#e8f0ec;font-weight:bold;}';
+  html += 'a{color:#5a7a6a;}</style>';
+  html += '<p style="font-size:11px;color:#888;">このURLを印刷して保護者に渡してください</p>';
+  html += '<table><tr><th>保護者名</th><th>園児名</th><th>クラス</th><th>専用URL</th></tr>';
+
+  for (var i = 1; i < data.length; i++) {
+    var row = data[i];
+    if (!row[0]) continue;
+    var url = webAppUrl + '?t=' + row[4];
+    html += '<tr><td>' + row[1] + '</td><td>' + row[2] + '</td><td>' + row[3] + '</td>';
+    html += '<td><a href="' + url + '" target="_blank">ページを開く</a></td></tr>';
+  }
+  html += '</table>';
+
+  SpreadsheetApp.getUi().showModalDialog(
+    HtmlService.createHtmlOutput(html).setWidth(720).setHeight(500),
+    '保護者ページ URL一覧'
+  );
+}
+
+// ===================================================
+// 保護者向けWebページ（doGet）
+// ===================================================
+function doGet(e) {
+  var token = e && e.parameter && e.parameter.t;
+
+  if (!token) {
+    return HtmlService.createHtmlOutput(errorPage('URLが正しくありません'));
+  }
+
+  try {
+    var ssId = PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID');
+    var ss = SpreadsheetApp.openById(ssId);
+    var master  = ss.getSheetByName(SHEET_MASTER);
+    var history = ss.getSheetByName(SHEET_HISTORY);
+    var settings = ss.getSheetByName(SHEET_SETTINGS);
+
+    // トークンから園児を特定
+    var masterData = master.getDataRange().getValues();
+    var childInfo = null;
+    for (var i = 1; i < masterData.length; i++) {
+      if (String(masterData[i][4]) === token) {
+        childInfo = {
+          id:           masterData[i][0],
+          guardianName: masterData[i][1],
+          name:         masterData[i][2],
+          cls:          masterData[i][3]
+        };
+        break;
+      }
+    }
+
+    if (!childInfo) {
+      return HtmlService.createHtmlOutput(errorPage('ページが見つかりません'));
+    }
+
+    // 請求履歴を取得（新しい順）
+    var histData = history.getDataRange().getValues();
+    var invoices = [];
+    for (var i = histData.length - 1; i >= 1; i--) {
+      if (String(histData[i][1]) === String(childInfo.id)) {
+        var fees = {};
+        try { fees = JSON.parse(histData[i][5] || '{}'); } catch(err) {}
+        invoices.push({
+          month:     histData[i][0],
+          fees:      fees,
+          total:     histData[i][6],
+          debitDate: histData[i][7],
+          notice:    histData[i][8]
+        });
+      }
+    }
+
+    var gardenName  = settings ? settings.getRange('B1').getValue() : '保育園';
+    var staffName   = settings ? settings.getRange('B2').getValue() : '';
+    var latestInvoice = invoices[0] || null;
+
+    var template = HtmlService.createTemplateFromFile('Page');
+    template.childInfo     = childInfo;
+    template.invoices      = invoices;
+    template.gardenName    = gardenName;
+    template.staffName     = staffName;
+    template.latestInvoice = latestInvoice;
+
+    return template.evaluate()
+      .setTitle(gardenName + ' | 保護者ページ')
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1.0');
+
+  } catch(e) {
+    return HtmlService.createHtmlOutput(errorPage('エラーが発生しました: ' + e.message));
+  }
+}
+
+function errorPage(msg) {
+  return '<html><body style="font-family:sans-serif;padding:40px;text-align:center;"><h2>⚠️ ' + msg + '</h2></body></html>';
+}
