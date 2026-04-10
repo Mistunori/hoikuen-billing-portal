@@ -17,6 +17,8 @@ function onOpen() {
     .addItem('🔗 保護者ページURL一覧', 'showUrls')
     .addSeparator()
     .addItem('⚙️ 初期設定（初回のみ）', 'setup')
+    .addSeparator()
+    .addItem('🔄 マスタデータをリセット', 'resetMasterData')
     .addToUi();
 }
 
@@ -27,16 +29,14 @@ function setup() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   PropertiesService.getScriptProperties().setProperty('SPREADSHEET_ID', ss.getId());
 
-  // マスタシート作成
-  if (!ss.getSheetByName(SHEET_MASTER)) {
-    var m = ss.insertSheet(SHEET_MASTER);
-    m.getRange(1, 1, 1, 9).setValues([['園児ID', '保護者名', '園児名', 'クラス', '兄弟グループID', 'トークン', '登録日', '専用URL', 'QRコードURL']]);
-    m.getRange(1, 1, 1, 9).setFontWeight('bold').setBackground('#e8f0ec');
-    m.setFrozenRows(1);
-    m.setColumnWidth(6, 160);
-    m.setColumnWidth(8, 300);
-    m.setColumnWidth(9, 300);
-  }
+  // マスタシート作成（既存の場合もヘッダーを強制上書き）
+  var m = ss.getSheetByName(SHEET_MASTER) || ss.insertSheet(SHEET_MASTER);
+  m.getRange(1, 1, 1, 9).setValues([['園児ID', '保護者名', '園児名', 'クラス', '兄弟グループID', 'トークン', '登録日', '専用URL', 'QRコードURL']]);
+  m.getRange(1, 1, 1, 9).setFontWeight('bold').setBackground('#e8f0ec');
+  m.setFrozenRows(1);
+  m.setColumnWidth(6, 160);
+  m.setColumnWidth(8, 300);
+  m.setColumnWidth(9, 300);
 
   // 請求履歴シート作成
   if (!ss.getSheetByName(SHEET_HISTORY)) {
@@ -58,7 +58,7 @@ function setup() {
     s.getRange('A1:A3').setFontWeight('bold');
   }
 
-  SpreadsheetApp.getUi().alert('✅ 初期設定が完了しました！\n\n次に：\n1. 設定シートで保育園名・担当者名を確認\n2. このスクリプトをウェブアプリとして公開\n（拡張機能→Apps Script→デプロイ→新しいデプロイ）');
+  SpreadsheetApp.getUi().alert('✅ 初期設定が完了しました！\n\n次に：\n1. 設定シートで保育園名・担当者名を確認\n2. このスクリプトをウェブアプリとして公開\n（拡張機能→Apps Script→デプロイ→新しいデプロイ）\n\n⚠️ マスタシートのデータが古い場合は\n「🔄 マスタデータをリセット」を実行してから\nxlsmを再取込みしてください。');
 }
 
 // ===================================================
@@ -285,6 +285,26 @@ function doGet(e) {
 
 function errorPage(msg) {
   return '<html><body style="font-family:sans-serif;padding:40px;text-align:center;"><h2>⚠️ ' + msg + '</h2></body></html>';
+}
+
+// ===================================================
+// マスタデータリセット
+// ===================================================
+function resetMasterData() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var master = ss.getSheetByName(SHEET_MASTER);
+  if (!master) return;
+  var ui = SpreadsheetApp.getUi();
+  var result = ui.alert(
+    '⚠️ 確認',
+    'マスタデータを全削除します。よろしいですか？\n（ヘッダー行は保持されます）',
+    ui.ButtonSet.OK_CANCEL
+  );
+  if (result === ui.Button.OK) {
+    var lastRow = master.getLastRow();
+    if (lastRow > 1) master.deleteRows(2, lastRow - 1);
+    ui.alert('✅ マスタデータを削除しました。xlsmを再取込みしてください。');
+  }
 }
 
 // ===================================================
