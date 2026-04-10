@@ -270,16 +270,23 @@ function doGet(e) {
 
     if (siblingGroupId) {
       // 自分を含む全兄弟のIDを取得
-      var familyIds = [String(childInfo.id)];
+      var familyIds = [];
       var familyNames = {};
-      familyNames[String(childInfo.id)] = { name: childInfo.name, cls: childInfo.cls };
 
       for (var i = 1; i < masterData.length; i++) {
         if (String(masterData[i][4]) === String(siblingGroupId)) {
           var fid = String(masterData[i][0]);
-          familyIds.push(fid);
-          familyNames[fid] = { name: masterData[i][2], cls: masterData[i][3] };
+          if (familyIds.indexOf(fid) < 0) {
+            familyIds.push(fid);
+            familyNames[fid] = { name: masterData[i][2], cls: masterData[i][3] };
+          }
         }
+      }
+
+      // 自分自身も追加（重複チェックつき）
+      if (familyIds.indexOf(String(childInfo.id)) < 0) {
+        familyIds.push(String(childInfo.id));
+        familyNames[String(childInfo.id)] = { name: childInfo.name, cls: childInfo.cls };
       }
 
       // 最新月の全兄弟の請求を取得
