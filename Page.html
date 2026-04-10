@@ -176,7 +176,7 @@ footer { text-align: center; font-size: 11px; color: var(--ink-light); padding: 
       <? for (var f = 0; f < familyInvoices.length; f++) { var fi = familyInvoices[f]; ?>
       <div style="margin-bottom:12px;">
         <div style="font-size:12px;font-weight:600;color:var(--ink-mid);margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--border);">
-          <?= fi.name ?>（<?= fi.cls ?>クラス）
+          <?= fi.name ?>（<?= fi.cls ?>）
           <span style="float:right;color:var(--sage);">¥<?= Number(fi.total).toLocaleString() ?></span>
         </div>
         <? var fkeys = Object.keys(fi.fees); for (var fk = 0; fk < fkeys.length; fk++) { ?>
