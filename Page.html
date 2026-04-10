@@ -91,7 +91,13 @@ footer { text-align: center; font-size: 11px; color: var(--ink-light); padding: 
   <div class="section-title">📋 今月の請求</div>
   <div class="invoice-card">
     <div class="invoice-header">
-      <div class="invoice-month"><?= latestInvoice.month ?>分</div>
+      <div class="invoice-month"><?
+  var m = latestInvoice.month;
+  if (m instanceof Date || (typeof m === 'string' && m.indexOf('GMT') >= 0)) {
+    var d = new Date(m);
+    m = d.getFullYear() + '年' + (d.getMonth()+1) + '月';
+  }
+?><?= m ?>分</div>
       <div>
         <div class="invoice-total-label">合計金額</div>
         <div class="invoice-total">¥<?= Number(latestInvoice.total).toLocaleString() ?></div>
@@ -131,7 +137,13 @@ footer { text-align: center; font-size: 11px; color: var(--ink-light); padding: 
     <? for (var j = 1; j < invoices.length; j++) { var inv = invoices[j]; ?>
     <div class="history-item" onclick="toggleDetail(<?= j ?>)">
       <div class="history-item-header">
-        <span class="history-month"><?= inv.month ?>分</span>
+        <span class="history-month"><?
+  var hm = inv.month;
+  if (hm instanceof Date || (typeof hm === 'string' && hm.indexOf('GMT') >= 0)) {
+    var hd = new Date(hm);
+    hm = hd.getFullYear() + '年' + (hd.getMonth()+1) + '月';
+  }
+?><?= hm ?>分</span>
         <span class="history-total">¥<?= Number(inv.total).toLocaleString() ?></span>
       </div>
       <div class="history-detail" id="detail-<?= j ?>">
