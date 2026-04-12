@@ -78,15 +78,10 @@ footer { text-align: center; font-size: 11px; color: var(--ink-light); padding: 
 <main>
 
 <?
-var FEE_ORDER = ['保育料','副食費','副食費(１ヶ月)','主食代','保護者会費',
-  '教材費','教材追加','教材費追加','追加購入','帽子購入',
-  '遠足代','月刊誌代','月刊誌'];
 function sortedKeys(feesObj) {
-  var keys = Object.keys(feesObj);
-  var ordered = [];
-  FEE_ORDER.forEach(function(k) { if (keys.indexOf(k) >= 0) ordered.push(k); });
-  keys.forEach(function(k) { if (ordered.indexOf(k) < 0) ordered.push(k); });
-  return ordered;
+  return Object.keys(feesObj).sort(function(a, b) {
+    return Number(feesObj[b]) - Number(feesObj[a]);
+  });
 }
 ?>
 
