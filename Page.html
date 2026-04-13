@@ -330,14 +330,15 @@ function toggleDetail(id) {
 
         setTimeout(function() {
           container.style.transition = '';
-          try {
-            var url = (typeof CURRENT_PAGE_URL !== 'undefined' && CURRENT_PAGE_URL)
-              ? CURRENT_PAGE_URL + '&_=' + Date.now()
-              : window.location.href.split('&_=')[0] + '&_=' + Date.now();
-            window.top.location.href = url;
-          } catch(e) {
-            refreshing = false;
-          }
+          var url = (typeof CURRENT_PAGE_URL !== 'undefined' && CURRENT_PAGE_URL)
+            ? CURRENT_PAGE_URL + '&_=' + Date.now()
+            : window.location.href.split('&_=')[0] + '&_=' + Date.now();
+          var a = document.createElement('a');
+          a.href = url;
+          a.target = '_top';
+          a.style.display = 'none';
+          document.body.appendChild(a);
+          a.click();
         }, 300);
       }, 400);
     } else {
