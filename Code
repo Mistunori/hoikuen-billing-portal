@@ -481,16 +481,16 @@ function doGet(e) {
     var latestInvoice = invoices[0] || null;
 
     var template = HtmlService.createTemplateFromFile('Page');
-    template.childInfo     = childInfo;
-    template.invoices      = invoices;
-    template.gardenName    = gardenName;
-    template.staffName     = staffName;
-    template.latestInvoice = latestInvoice;
-    template.siblings      = siblings;
-    template.webAppUrl     = getWebAppUrl();
-    template.currentPageUrl = getWebAppUrl() + '?t=' + token;
-    template.familyTotal   = familyTotal;
+    template.childInfo      = childInfo;
+    template.invoices       = invoices;
+    template.gardenName     = gardenName;
+    template.staffName      = staffName;
+    template.latestInvoice  = latestInvoice;
+    template.siblings       = siblings;
+    template.webAppUrl      = getWebAppUrl();
+    template.familyTotal    = familyTotal;
     template.familyInvoices = familyInvoices;
+    template.currentPageUrl = getWebAppUrl() + '?t=' + token;
 
     return template.evaluate()
       .setTitle(gardenName + ' | 保護者ページ')
