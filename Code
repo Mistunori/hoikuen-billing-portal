@@ -488,6 +488,7 @@ function doGet(e) {
     template.latestInvoice = latestInvoice;
     template.siblings      = siblings;
     template.webAppUrl     = getWebAppUrl();
+    template.currentPageUrl = getWebAppUrl() + '?t=' + token;
     template.familyTotal   = familyTotal;
     template.familyInvoices = familyInvoices;
 
