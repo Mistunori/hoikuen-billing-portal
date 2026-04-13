@@ -171,32 +171,189 @@ function showUrls() {
   var master = ss.getSheetByName(SHEET_MASTER);
   if (!master) { SpreadsheetApp.getUi().alert('先にデータを取込んでください'); return; }
 
-  var webAppUrl = getWebAppUrl();
   var data = master.getDataRange().getValues();
+  var webAppUrl = getWebAppUrl();
 
-  var html = '<style>body{font-family:sans-serif;font-size:12px;padding:10px;}';
-  html += 'table{border-collapse:collapse;width:100%;}';
-  html += 'th,td{border:1px solid #ddd;padding:6px 8px;}';
-  html += 'th{background:#e8f0ec;font-weight:bold;}';
-  html += 'a{color:#5a7a6a;}</style>';
-  html += '<p style="font-size:11px;color:#888;">このURLを印刷して保護者に渡してください</p>';
-  html += '<table><tr><th>保護者名</th><th>園児名</th><th>クラス</th><th>専用URL</th><th>QRコード</th></tr>';
-
+  var rows = [];
   for (var i = 1; i < data.length; i++) {
     var row = data[i];
     if (!row[0]) continue;
-    var url = webAppUrl + '?t=' + row[5];
-    var qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(url);
-    html += '<tr><td>' + row[1] + '</td><td>' + row[2] + '</td><td>' + row[3] + '</td>';
-    html += '<td><a href="' + url + '" target="_blank">ページを開く</a></td>';
-    html += '<td><img src="' + qrUrl + '" width="80"></td></tr>';
+    rows.push({
+      rowIndex: i + 1,
+      id: String(row[0]),
+      name: String(row[2]),
+      cls: String(row[3]),
+      groupId: row[4] !== '' && row[4] !== null && row[4] !== undefined ? String(row[4]) : ''
+    });
   }
-  html += '</table>';
+
+  var rowsJson = JSON.stringify(rows);
+
+  var html = '<!DOCTYPE html><html><head><meta charset="UTF-8">';
+  html += '<style>';
+  html += '*{box-sizing:border-box;margin:0;padding:0;}';
+  html += 'body{font-family:sans-serif;font-size:13px;background:#faf8f4;display:flex;flex-direction:column;height:100vh;}';
+  html += '.toolbar{background:#5a7a6a;color:white;padding:10px 14px;display:flex;gap:8px;align-items:center;flex-shrink:0;}';
+  html += '.toolbar span{font-size:11px;opacity:0.8;margin-right:auto;}';
+  html += '.btn{padding:7px 16px;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:bold;font-family:inherit;}';
+  html += '.btn-group{background:#fff;color:#5a7a6a;}';
+  html += '.btn-group:hover{background:#e8f0ec;}';
+  html += '.btn-group:disabled{background:#b8cfc4;color:white;cursor:not-allowed;}';
+  html += '.btn-clear{background:rgba(255,255,255,0.2);color:white;}';
+  html += '.btn-clear:hover{background:rgba(255,255,255,0.3);}';
+  html += '.btn-clear:disabled{opacity:0.4;cursor:not-allowed;}';
+  html += '.btn-save{background:#2e7d52;color:white;}';
+  html += '.btn-save:hover{background:#1e6040;}';
+  html += '.table-wrap{flex:1;overflow-y:auto;padding:10px;}';
+  html += 'table{width:100%;border-collapse:collapse;background:white;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.08);}';
+  html += 'th{background:#e8f0ec;padding:8px 10px;text-align:left;font-size:11px;color:#4a5450;border-bottom:1px solid #dde5e0;position:sticky;top:0;z-index:1;}';
+  html += 'td{padding:8px 10px;border-bottom:1px solid #f0f0f0;cursor:pointer;transition:background 0.1s;}';
+  html += 'tr.selected td{background:#d0e8f8 !important;outline:2px solid #378add;outline-offset:-2px;}';
+  html += 'tr:hover:not(.selected) td{filter:brightness(0.96);}';
+  html += '.gid-badge{display:inline-block;width:28px;height:28px;border-radius:50%;color:white;font-size:11px;font-weight:bold;text-align:center;line-height:28px;}';
+  html += '.msg{padding:8px 14px;font-size:12px;flex-shrink:0;}';
+  html += '.msg.ok{background:#eaf4ef;color:#2e7d52;}';
+  html += '.msg.err{background:#fdf0ee;color:#c0392b;}';
+  html += '</style></head><body>';
+
+  html += '<div class="toolbar">';
+  html += '<button class="btn btn-group" id="btnGroup" onclick="groupSelected()" disabled>👨‍👩‍👧 グループ化</button>';
+  html += '<button class="btn btn-clear" id="btnClear" onclick="clearSelected()" disabled>✕ グループ解除</button>';
+  html += '<span id="selMsg">行をクリックして選択（複数可）</span>';
+  html += '<button class="btn btn-save" onclick="saveAll()">💾 マスタに保存</button>';
+  html += '</div>';
+
+  html += '<div class="table-wrap">';
+  html += '<table><thead><tr>';
+  html += '<th style="width:50px">グループ</th><th>園児名</th><th>クラス</th>';
+  html += '</tr></thead><tbody id="tbody"></tbody></table>';
+  html += '</div>';
+  html += '<div id="msg" class="msg" style="display:none"></div>';
+
+  html += '<script>';
+  html += 'var rows = ' + rowsJson + ';';
+  html += 'var selected = [];';
+  html += 'var GROUP_COLORS = ["#e74c3c","#e67e22","#27ae60","#2980b9","#8e44ad","#16a085","#c0392b","#d35400","#1abc9c","#3498db"];';
+
+  html += 'function getColor(gid) {';
+  html += '  if (!gid) return "#ccc";';
+  html += '  return GROUP_COLORS[(parseInt(gid)-1) % GROUP_COLORS.length];';
+  html += '}';
+
+  html += 'function render() {';
+  html += '  var sorted = rows.slice().sort(function(a,b){';
+  html += '    if(a.groupId===b.groupId) return 0;';
+  html += '    if(a.groupId==="") return 1;';
+  html += '    if(b.groupId==="") return -1;';
+  html += '    return parseInt(a.groupId)-parseInt(b.groupId);';
+  html += '  });';
+  html += '  var tb = document.getElementById("tbody");';
+  html += '  tb.innerHTML = "";';
+  html += '  sorted.forEach(function(r) {';
+  html += '    var tr = document.createElement("tr");';
+  html += '    tr.dataset.rowIndex = r.rowIndex;';
+  html += '    tr.dataset.id = r.id;';
+  html += '    if (selected.indexOf(r.id) >= 0) tr.classList.add("selected");';
+  html += '    var badge = r.groupId ? \'<div class="gid-badge" style="background:\'+getColor(r.groupId)+\'">\'+r.groupId+"</div>" : \'<div class="gid-badge" style="background:#ccc;opacity:0.4">-</div>\';';
+  html += '    tr.innerHTML = "<td style=\'text-align:center\'>"+badge+"</td><td><strong>"+r.name+"</strong></td><td>"+r.cls+"</td>";';
+  html += '    tr.onclick = function() { toggleSelect(r.id); };';
+  html += '    tb.appendChild(tr);';
+  html += '  });';
+  html += '  updateButtons();';
+  html += '}';
+
+  html += 'function toggleSelect(id) {';
+  html += '  var idx = selected.indexOf(id);';
+  html += '  if (idx >= 0) selected.splice(idx,1);';
+  html += '  else selected.push(id);';
+  html += '  render();';
+  html += '}';
+
+  html += 'function updateButtons() {';
+  html += '  var btnG = document.getElementById("btnGroup");';
+  html += '  var btnC = document.getElementById("btnClear");';
+  html += '  var msg = document.getElementById("selMsg");';
+  html += '  btnG.disabled = selected.length < 2;';
+  html += '  btnC.disabled = selected.length === 0;';
+  html += '  if (selected.length === 0) msg.textContent = "行をクリックして選択（複数可）";';
+  html += '  else msg.textContent = selected.length + "件選択中";';
+  html += '}';
+
+  html += 'function groupSelected() {';
+  html += '  if (selected.length < 2) return;';
+  html += '  var existingGroup = "";';
+  html += '  rows.forEach(function(r) {';
+  html += '    if (selected.indexOf(r.id) >= 0 && r.groupId) existingGroup = r.groupId;';
+  html += '  });';
+  html += '  if (!existingGroup) {';
+  html += '    var used = {};';
+  html += '    rows.forEach(function(r){ if(r.groupId) used[r.groupId]=true; });';
+  html += '    var n = 1;';
+  html += '    while(used[String(n)]) n++;';
+  html += '    existingGroup = String(n);';
+  html += '  }';
+  html += '  rows.forEach(function(r) {';
+  html += '    if (selected.indexOf(r.id) >= 0) r.groupId = existingGroup;';
+  html += '  });';
+  html += '  selected = [];';
+  html += '  render();';
+  html += '}';
+
+  html += 'function clearSelected() {';
+  html += '  rows.forEach(function(r) {';
+  html += '    if (selected.indexOf(r.id) >= 0) r.groupId = "";';
+  html += '  });';
+  html += '  selected = [];';
+  html += '  render();';
+  html += '}';
+
+  html += 'function saveAll() {';
+  html += '  var updates = rows.map(function(r){ return { rowIndex: r.rowIndex, groupId: r.groupId }; });';
+  html += '  var btn = document.querySelector(".btn-save");';
+  html += '  btn.disabled = true; btn.textContent = "保存中...";';
+  html += '  google.script.run';
+  html += '    .withSuccessHandler(function(res) {';
+  html += '      var m = document.getElementById("msg");';
+  html += '      m.className = "msg " + (res.success ? "ok" : "err");';
+  html += '      m.textContent = res.success ? "✅ 保存しました" : "❌ " + res.error;';
+  html += '      m.style.display = "block";';
+  html += '      btn.disabled = false; btn.textContent = "💾 マスタに保存";';
+  html += '    })';
+  html += '    .withFailureHandler(function(e) {';
+  html += '      var m = document.getElementById("msg");';
+  html += '      m.className = "msg err";';
+  html += '      m.textContent = "❌ " + (e.message||e);';
+  html += '      m.style.display = "block";';
+  html += '      btn.disabled = false; btn.textContent = "💾 マスタに保存";';
+  html += '    })';
+  html += '    .saveSiblingGroups(updates);';
+  html += '}';
+
+  html += 'render();';
+  html += '</script></body></html>';
 
   SpreadsheetApp.getUi().showModalDialog(
-    HtmlService.createHtmlOutput(html).setWidth(720).setHeight(500),
-    '保護者ページ URL一覧'
+    HtmlService.createHtmlOutput(html).setWidth(500).setHeight(600),
+    '🔗 兄弟グループ管理'
   );
+}
+
+// ===================================================
+// 兄弟グループをマスタに保存（showUrlsダイアログから呼ばれる）
+// ===================================================
+function saveSiblingGroups(updates) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var master = ss.getSheetByName(SHEET_MASTER);
+    if (!master) return { success: false, error: 'マスタシートが見つかりません' };
+    for (var i = 0; i < updates.length; i++) {
+      var u = updates[i];
+      master.getRange(u.rowIndex, 5).setValue(u.groupId);  // E列：兄弟グループID
+    }
+    return { success: true };
+  } catch(e) {
+    return { success: false, error: e.message };
+  }
 }
 
 // ===================================================
