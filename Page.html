@@ -92,7 +92,6 @@ footer { text-align: center; font-size: 11px; color: var(--ink-light); padding: 
 </style>
 </head>
 <body>
-<script>var CURRENT_PAGE_URL = '<?= currentPageUrl ?>';</script>
 
 <div id="ptr-container"><div id="ptr-spinner"></div></div>
 
@@ -330,15 +329,7 @@ function toggleDetail(id) {
 
         setTimeout(function() {
           container.style.transition = '';
-          var url = (typeof CURRENT_PAGE_URL !== 'undefined' && CURRENT_PAGE_URL)
-            ? CURRENT_PAGE_URL + '&_=' + Date.now()
-            : window.location.href.split('&_=')[0] + '&_=' + Date.now();
-          var a = document.createElement('a');
-          a.href = url;
-          a.target = '_top';
-          a.style.display = 'none';
-          document.body.appendChild(a);
-          a.click();
+          window.location.reload();
         }, 300);
       }, 400);
     } else {
