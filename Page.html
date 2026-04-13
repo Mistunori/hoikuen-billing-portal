@@ -334,7 +334,7 @@ function toggleDetail(id) {
             var url = (typeof CURRENT_PAGE_URL !== 'undefined' && CURRENT_PAGE_URL)
               ? CURRENT_PAGE_URL + '&_=' + Date.now()
               : window.location.href.split('&_=')[0] + '&_=' + Date.now();
-            window.location.href = url;
+            window.top.location.href = url;
           } catch(e) {
             refreshing = false;
           }
