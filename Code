@@ -16,7 +16,6 @@ function onOpen() {
     .addSeparator()
     .addItem('🔗 保護者ページURL一覧', 'showUrls')
     .addItem('📄 QRコード配布用ドキュメント生成', 'generateHandoutDoc')
-    .addItem('👨‍👩‍👧 兄弟グループ一覧', 'showSiblingGroups')
     .addSeparator()
     .addItem('⚙️ 初期設定（初回のみ）', 'setup')
     .addSeparator()
@@ -346,105 +345,19 @@ function saveSiblingGroups(updates) {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var master = ss.getSheetByName(SHEET_MASTER);
     if (!master) return { success: false, error: 'マスタシートが見つかりません' };
+    var count = 0;
     for (var i = 0; i < updates.length; i++) {
       var u = updates[i];
-      master.getRange(u.rowIndex, 5).setValue(u.groupId);  // E列：兄弟グループID
+      var val = u.groupId === '' ? '' : Number(u.groupId);
+      master.getRange(u.rowIndex, 5).setValue(val);  // E列：兄弟グループID
+      count++;
     }
-    return { success: true };
+    return { success: true, count: count };
   } catch(e) {
     return { success: false, error: e.message };
   }
 }
 
-// ===================================================
-// 兄弟グループ一覧を表示
-// ===================================================
-function showSiblingGroups() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var master = ss.getSheetByName(SHEET_MASTER);
-  if (!master) { SpreadsheetApp.getUi().alert('マスタデータがありません'); return; }
-
-  var data = master.getDataRange().getValues();
-  if (data.length <= 1) { SpreadsheetApp.getUi().alert('マスタデータがありません'); return; }
-
-  // グループIDごとに園児を振り分け
-  var groups = {};   // { groupId: [{name, cls}] }
-  var ungrouped = [];
-
-  for (var i = 1; i < data.length; i++) {
-    var row = data[i];
-    if (!row[0]) continue;
-    var childName = String(row[2]);
-    var cls       = String(row[3]);
-    var groupId   = String(row[4]).trim();
-
-    if (groupId) {
-      if (!groups[groupId]) groups[groupId] = [];
-      groups[groupId].push({ name: childName, cls: cls });
-    } else {
-      ungrouped.push({ name: childName, cls: cls });
-    }
-  }
-
-  var groupKeys = Object.keys(groups);
-  var groupedCount = 0;
-  groupKeys.forEach(function(k) { groupedCount += groups[k].length; });
-
-  // HTML生成
-  var s = '<style>';
-  s += 'body{font-family:"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;font-size:13px;padding:12px;background:#faf8f4;color:#1a1f1c;}';
-  s += '.summary{background:#e8f0ec;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#4a5450;}';
-  s += '.summary b{color:#5a7a6a;}';
-  s += '.group-card{background:white;border:1px solid #dde5e0;border-radius:10px;padding:12px 16px;margin-bottom:10px;}';
-  s += '.group-id{font-size:11px;color:#8a9490;margin-bottom:6px;}';
-  s += '.child-row{display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid #f5f5f5;font-size:13px;}';
-  s += '.child-row:last-child{border-bottom:none;}';
-  s += '.child-row::before{content:"・";color:#b8cfc4;}';
-  s += '.cls-badge{font-size:11px;color:#8a9490;margin-left:4px;}';
-  s += 'details{margin-top:10px;}';
-  s += 'summary{cursor:pointer;font-size:12px;color:#5a7a6a;font-weight:600;padding:8px 0;list-style:none;}';
-  s += 'summary::-webkit-details-marker{display:none;}';
-  s += '.ungrouped-card{background:white;border:1px solid #dde5e0;border-radius:10px;padding:12px 16px;margin-top:4px;}';
-  s += '.empty{color:#8a9490;font-size:12px;padding:20px;text-align:center;}';
-  s += '</style>';
-
-  // サマリー
-  s += '<div class="summary">';
-  s += '兄弟グループ：<b>' + groupKeys.length + ' 組</b>　';
-  s += '紐づけ済み園児：<b>' + groupedCount + ' 名</b>　';
-  s += '未設定：<b>' + ungrouped.length + ' 名</b>';
-  s += '</div>';
-
-  if (groupKeys.length === 0) {
-    s += '<div class="empty">兄弟グループが設定されていません。<br>マスタシートのE列（兄弟グループID）に同じ値を入力してグループを作成してください。</div>';
-  } else {
-    groupKeys.forEach(function(gid) {
-      s += '<div class="group-card">';
-      s += '<div class="group-id">グループID：' + gid + '　（' + groups[gid].length + '名）</div>';
-      groups[gid].forEach(function(c) {
-        s += '<div class="child-row">' + c.name + '<span class="cls-badge">（' + c.cls + '）</span></div>';
-      });
-      s += '</div>';
-    });
-  }
-
-  // 未設定セクション（折りたたみ）
-  if (ungrouped.length > 0) {
-    s += '<details>';
-    s += '<summary>▶ 未設定の園児（' + ungrouped.length + '名）</summary>';
-    s += '<div class="ungrouped-card">';
-    ungrouped.forEach(function(c) {
-      s += '<div class="child-row">' + c.name + '<span class="cls-badge">（' + c.cls + '）</span></div>';
-    });
-    s += '</div>';
-    s += '</details>';
-  }
-
-  SpreadsheetApp.getUi().showModalDialog(
-    HtmlService.createHtmlOutput(s).setWidth(600).setHeight(520),
-    '👨‍👩‍👧 兄弟グループ一覧'
-  );
-}
 
 // ===================================================
 // 保護者向けWebページ（doGet）
