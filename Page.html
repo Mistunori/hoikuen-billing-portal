@@ -315,7 +315,7 @@ function toggleDetail(id) {
         spinner.classList.remove('spinning');
         container.style.transform = 'translateY(-52px)';
         setTimeout(function() {
-          window.location.reload();
+          window.top.location.reload();
         }, 100);
       }, 250);
     } else {
