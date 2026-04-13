@@ -109,7 +109,7 @@ function sortedKeys(feesObj) {
     "><?= childInfo.name ?></button>
     <? for (var s = 0; s < siblings.length; s++) { var sib = siblings[s]; ?>
     <a href="<?= webAppUrl ?>?t=<?= sib.token ?>"
-       onclick="this.href='<?= webAppUrl ?>?t=<?= sib.token ?>&_='+Date.now()"
+       onclick="this.href='<?= webAppUrl ?>?t=<?= sib.token ?>&_='+Date.now();return true;"
        style="
       display:inline-flex;
       align-items:center;
