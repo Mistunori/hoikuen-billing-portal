@@ -284,31 +284,33 @@ function toggleDetail(id) {
 // Pull to Refresh
 (function() {
   var THRESHOLD = 120;
-  var main = document.querySelector('main');
-  var spinner = document.getElementById('ptr-spinner');
   var container = document.getElementById('ptr-container');
+  var spinner = document.getElementById('ptr-spinner');
   var startY = 0;
   var refreshing = false;
 
   document.addEventListener('touchstart', function(e) {
+    if (refreshing) return;
     startY = e.touches[0].pageY;
   }, { passive: true });
 
   document.addEventListener('touchmove', function(e) {
+    if (refreshing) return;
     var y = e.touches[0].pageY;
     var dist = y - startY;
-    var scrollTop = window.scrollY || window.pageYOffset || document.documentElement.scrollTop;
+    var scrollTop = window.scrollY || window.pageYOffset || 0;
 
-    if (scrollTop <= 0 && dist > 60 && !refreshing) {
+    if (scrollTop <= 0 && dist > 0) {
       var progress = Math.min(dist * 0.5, THRESHOLD + 20);
       container.style.transition = 'none';
       container.style.transform = 'translateY(' + (progress - 52) + 'px)';
-      spinner.classList.add('visible');
+      if (dist > 30) spinner.classList.add('visible');
     }
   }, { passive: true });
 
-  document.addEventListener('touchend', function(e) {
+  document.addEventListener('touchend', function() {
     if (refreshing) return;
+
     var match = container.style.transform.match(/translateY\(([^p]+)px\)/);
     var offset = match ? parseFloat(match[1]) : -52;
     var pullDist = offset + 52;
@@ -318,14 +320,25 @@ function toggleDetail(id) {
       spinner.classList.add('spinning');
       container.style.transition = 'transform 0.2s ease';
       container.style.transform = 'translateY(0px)';
+
       setTimeout(function() {
         spinner.classList.remove('visible');
         spinner.classList.remove('spinning');
+        container.style.transition = 'transform 0.3s ease';
         container.style.transform = 'translateY(-52px)';
-        container.style.transition = '';
+
         setTimeout(function() {
-          window.location.reload();
-        }, 100);
+          container.style.transition = '';
+          try {
+            window.location.reload();
+          } catch(e) {
+            try {
+              window.location.href = window.location.href;
+            } catch(e2) {
+              refreshing = false;
+            }
+          }
+        }, 300);
       }, 400);
     } else {
       container.style.transition = 'transform 0.3s ease';
