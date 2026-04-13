@@ -201,7 +201,8 @@ function sortedKeys(feesObj) {
       <? if (latestInvoice.notice) { ?>
       <div class="notice-box">
         <strong>📢 園からのお知らせ</strong>
-        <?= latestInvoice.notice ?>
+        <? var noticeHtml = String(latestInvoice.notice).replace(/\n/g, '<br>'); ?>
+        <?= noticeHtml ?>
       </div>
       <? } ?>
     </div>
