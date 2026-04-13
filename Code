@@ -14,7 +14,7 @@ function onOpen() {
     .createMenu('🌿 請求管理')
     .addItem('📂 xlsmを取込む', 'showImportDialog')
     .addSeparator()
-    .addItem('🔗 保護者ページURL一覧', 'showUrls')
+    .addItem('🔗 保護者ページ・兄弟グループ管理', 'showUrls')
     .addItem('📄 QRコード配布用ドキュメント生成', 'generateHandoutDoc')
     .addSeparator()
     .addItem('⚙️ 初期設定（初回のみ）', 'setup')
