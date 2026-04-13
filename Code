@@ -318,7 +318,8 @@ function doGet(e) {
           id:           masterData[i][0],
           guardianName: masterData[i][1],
           name:         masterData[i][2],
-          cls:          masterData[i][3]
+          cls:          masterData[i][3],
+          updatedAt:    masterData[i][6]  // G列：登録日
         };
         break;
       }

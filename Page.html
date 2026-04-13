@@ -118,6 +118,17 @@ function sortedKeys(feesObj) {
     <div>
       <div class="child-name"><?= childInfo.name ?></div>
       <div class="child-sub">クラス：<?= childInfo.cls ?></div>
+      <?
+        var ud = childInfo.updatedAt;
+        var udStr = '';
+        if (ud) {
+          var udd = new Date(ud);
+          udStr = udd.getFullYear() + '/' + (udd.getMonth()+1) + '/' + udd.getDate();
+        }
+      ?>
+      <? if (udStr) { ?>
+      <div style="font-size:11px;color:var(--ink-light);margin-top:4px;">更新：<?= udStr ?></div>
+      <? } ?>
     </div>
   </div>
 
