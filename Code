@@ -488,6 +488,7 @@ function doGet(e) {
     template.latestInvoice  = latestInvoice;
     template.siblings       = siblings;
     template.webAppUrl      = getWebAppUrl();
+    template.pageToken      = token;
     template.familyTotal    = familyTotal;
     template.familyInvoices = familyInvoices;
 
@@ -503,6 +504,139 @@ function doGet(e) {
 
 function errorPage(msg) {
   return '<html><body style="font-family:sans-serif;padding:40px;text-align:center;"><h2>⚠️ ' + msg + '</h2></body></html>';
+}
+
+// ===================================================
+// Pull-to-Refresh用：請求データをJSONで返す
+// ===================================================
+function getInvoiceData(token) {
+  try {
+    var ssId = PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID');
+    var ss = SpreadsheetApp.openById(ssId);
+    var master  = ss.getSheetByName(SHEET_MASTER);
+    var history = ss.getSheetByName(SHEET_HISTORY);
+    var settings = ss.getSheetByName(SHEET_SETTINGS);
+
+    // トークンから園児を特定
+    var masterData = master.getDataRange().getValues();
+    var childInfo = null;
+    var siblingGroupId = '';
+    for (var i = 1; i < masterData.length; i++) {
+      if (String(masterData[i][5]) === token) {
+        siblingGroupId = masterData[i][4];
+        childInfo = {
+          id:           masterData[i][0],
+          guardianName: masterData[i][1],
+          name:         masterData[i][2],
+          cls:          masterData[i][3],
+          updatedAt:    masterData[i][6] ? new Date(masterData[i][6]).toISOString() : ''
+        };
+        break;
+      }
+    }
+    if (!childInfo) return null;
+
+    // 兄弟を取得
+    var siblings = [];
+    if (siblingGroupId) {
+      for (var i = 1; i < masterData.length; i++) {
+        if (String(masterData[i][4]) === String(siblingGroupId) && String(masterData[i][0]) !== String(childInfo.id)) {
+          siblings.push({ name: masterData[i][2], cls: masterData[i][3], token: String(masterData[i][5]) });
+        }
+      }
+    }
+
+    // 請求履歴を取得（新しい順）
+    var histData = history.getDataRange().getValues();
+    var invoices = [];
+    for (var i = histData.length - 1; i >= 1; i--) {
+      if (String(histData[i][1]) === String(childInfo.id)) {
+        var fees = {};
+        try { fees = JSON.parse(histData[i][5] || '{}'); } catch(err) {}
+        var monthVal = histData[i][0];
+        var monthStr = monthVal;
+        if (monthVal instanceof Date) {
+          monthStr = monthVal.getFullYear() + '年' + (monthVal.getMonth()+1) + '月';
+        } else if (typeof monthVal === 'string' && monthVal.indexOf('GMT') >= 0) {
+          var md = new Date(monthVal);
+          monthStr = md.getFullYear() + '年' + (md.getMonth()+1) + '月';
+        }
+        invoices.push({
+          month:     monthStr,
+          fees:      fees,
+          total:     histData[i][6],
+          debitDate: histData[i][7] || '',
+          notice:    histData[i][8] || ''
+        });
+      }
+    }
+
+    // 兄弟合算データ
+    var familyTotal = 0;
+    var familyInvoices = [];
+    if (siblingGroupId) {
+      var familyIds = [];
+      var familyNames = {};
+      for (var i = 1; i < masterData.length; i++) {
+        if (String(masterData[i][4]) === String(siblingGroupId)) {
+          var fid = String(masterData[i][0]);
+          if (familyIds.indexOf(fid) < 0) {
+            familyIds.push(fid);
+            familyNames[fid] = { name: masterData[i][2], cls: masterData[i][3] };
+          }
+        }
+      }
+      if (familyIds.indexOf(String(childInfo.id)) < 0) {
+        familyIds.push(String(childInfo.id));
+        familyNames[String(childInfo.id)] = { name: childInfo.name, cls: childInfo.cls };
+      }
+      var latestMonth = invoices.length > 0 ? String(invoices[0].month) : '';
+      if (latestMonth) {
+        var addedIds = [];
+        for (var i = histData.length - 1; i >= 1; i--) {
+          var hid = String(histData[i][1]);
+          var hMonthVal = histData[i][0];
+          var hMonthStr = hMonthVal;
+          if (hMonthVal instanceof Date) {
+            hMonthStr = hMonthVal.getFullYear() + '年' + (hMonthVal.getMonth()+1) + '月';
+          } else if (typeof hMonthVal === 'string' && hMonthVal.indexOf('GMT') >= 0) {
+            var hmd = new Date(hMonthVal);
+            hMonthStr = hmd.getFullYear() + '年' + (hmd.getMonth()+1) + '月';
+          }
+          if (familyIds.indexOf(hid) >= 0
+              && String(hMonthStr) === latestMonth
+              && addedIds.indexOf(hid) < 0) {
+            var hfees = {};
+            try { hfees = JSON.parse(histData[i][5] || '{}'); } catch(e) {}
+            var htotal = histData[i][6];
+            familyTotal += Number(htotal) || 0;
+            familyInvoices.push({
+              name: familyNames[hid] ? familyNames[hid].name : hid,
+              cls: familyNames[hid] ? familyNames[hid].cls : '',
+              fees: hfees,
+              total: htotal
+            });
+            addedIds.push(hid);
+          }
+        }
+      }
+    }
+
+    var gardenName = settings ? settings.getRange('B1').getValue() : '保育園';
+
+    return {
+      childInfo: childInfo,
+      invoices: invoices,
+      gardenName: gardenName,
+      latestInvoice: invoices[0] || null,
+      siblings: siblings,
+      familyTotal: familyTotal,
+      familyInvoices: familyInvoices,
+      webAppUrl: getWebAppUrl()
+    };
+  } catch(e) {
+    return null;
+  }
 }
 
 // ===================================================
