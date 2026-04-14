@@ -92,6 +92,7 @@ footer { text-align: center; font-size: 11px; color: var(--ink-light); padding: 
 </style>
 </head>
 <body>
+<script>var PAGE_TOKEN = '<?= pageToken ?>';</script>
 
 <div id="ptr-container"><div id="ptr-spinner"></div></div>
 
@@ -282,6 +283,108 @@ function toggleDetail(id) {
   el.classList.toggle('open');
 }
 
+function refreshPage(data) {
+  function sortedKeys(feesObj) {
+    return Object.keys(feesObj).sort(function(a, b) {
+      return Number(feesObj[b]) - Number(feesObj[a]);
+    });
+  }
+  function yen(n) { return '¥' + Number(n).toLocaleString(); }
+
+  var ci = data.childInfo;
+  var html = '';
+
+  // 子供情報カード
+  var udStr = '';
+  if (ci.updatedAt) {
+    var udd = new Date(ci.updatedAt);
+    udStr = udd.getFullYear() + '/' + (udd.getMonth()+1) + '/' + udd.getDate();
+  }
+  html += '<div class="child-card"><div>';
+  html += '<div class="child-name">' + ci.name + '</div>';
+  html += '<div class="child-sub">クラス：' + ci.cls + '</div>';
+  if (udStr) html += '<div style="font-size:11px;color:var(--ink-light);margin-top:4px;">更新：' + udStr + '</div>';
+  html += '</div></div>';
+
+  // 兄弟ナビゲーション
+  if (data.siblings && data.siblings.length > 0) {
+    html += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px;">';
+    html += '<button style="background:var(--sage);color:white;border:2px solid var(--sage);border-radius:24px;padding:8px 20px;font-size:13px;font-weight:600;font-family:inherit;cursor:default;">' + ci.name + '</button>';
+    for (var s = 0; s < data.siblings.length; s++) {
+      var sib = data.siblings[s];
+      html += '<a href="' + data.webAppUrl + '?t=' + sib.token + '"'
+        + ' onclick="this.href=\'' + data.webAppUrl + '?t=' + sib.token + '&_=\'+Date.now();return true;"'
+        + ' target="_top"'
+        + ' style="display:inline-flex;align-items:center;background:white;color:var(--sage);border:2px solid var(--sage);border-radius:24px;padding:8px 20px;font-size:13px;font-weight:600;text-decoration:none;">'
+        + sib.name + '</a>';
+    }
+    html += '</div>';
+  }
+
+  // 今月の請求
+  var inv = data.latestInvoice;
+  if (inv) {
+    html += '<div class="section-title">📋 今月の請求</div>';
+    html += '<div class="invoice-card">';
+    html += '<div class="invoice-header"><div class="invoice-month">' + inv.month + '分</div>';
+    html += '<div><div class="invoice-total-label">合計金額</div><div class="invoice-total">' + yen(inv.total) + '</div></div></div>';
+    html += '<div class="invoice-body">';
+    var fk = sortedKeys(inv.fees);
+    for (var i = 0; i < fk.length; i++) {
+      html += '<div class="fee-row"><span class="fee-name">' + fk[i] + '</span><span class="fee-amount">' + yen(inv.fees[fk[i]]) + '</span></div>';
+    }
+    if (inv.debitDate) {
+      html += '<div class="debit-notice">🏦 <span>' + inv.debitDate + 'に口座より自動引き落としいたします。<br>前日までに残高をご確認ください。</span></div>';
+    }
+    if (inv.notice) {
+      html += '<div class="notice-box"><strong>📢 園からのお知らせ</strong>' + String(inv.notice).replace(/\n/g, '<br>') + '</div>';
+    }
+    html += '</div></div>';
+  } else {
+    html += '<div class="empty">現在表示できる請求データがありません</div>';
+  }
+
+  // 世帯合計
+  if (data.familyInvoices && data.familyInvoices.length > 1) {
+    html += '<div class="section-title" style="margin-top:0;">👨‍👩‍👧 世帯合計</div>';
+    html += '<div class="invoice-card" style="margin-bottom:20px;"><div class="invoice-header" style="background:#4a5450;">';
+    html += '<div class="invoice-month">今月の世帯合計</div><div><div class="invoice-total-label">合計金額</div>';
+    html += '<div class="invoice-total">' + yen(data.familyTotal) + '</div></div></div><div class="invoice-body">';
+    for (var f = 0; f < data.familyInvoices.length; f++) {
+      var fi = data.familyInvoices[f];
+      html += '<div style="margin-bottom:12px;"><div style="font-size:12px;font-weight:600;color:var(--ink-mid);margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--border);">';
+      html += fi.name + '（' + fi.cls + '）<span style="float:right;color:var(--sage);">' + yen(fi.total) + '</span></div>';
+      var ffk = sortedKeys(fi.fees);
+      for (var fki = 0; fki < ffk.length; fki++) {
+        html += '<div class="fee-row" style="padding:4px 0;"><span class="fee-name" style="padding-left:8px;">' + ffk[fki] + '</span><span class="fee-amount">' + yen(fi.fees[ffk[fki]]) + '</span></div>';
+      }
+      html += '</div>';
+    }
+    html += '</div></div>';
+  }
+
+  // 過去の請求履歴
+  if (data.invoices.length > 1) {
+    html += '<div class="section-title" style="margin-top:24px;">📁 過去の請求履歴</div><div class="history-list">';
+    for (var j = 1; j < data.invoices.length; j++) {
+      var hi = data.invoices[j];
+      html += '<div class="history-item" onclick="toggleDetail(' + j + ')">';
+      html += '<div class="history-item-header"><span class="history-month">' + hi.month + '分</span>';
+      html += '<span class="history-total">' + yen(hi.total) + '</span></div>';
+      html += '<div class="history-detail" id="detail-' + j + '">';
+      var hk = sortedKeys(hi.fees);
+      for (var k = 0; k < hk.length; k++) {
+        html += '<div class="history-fee-row"><span style="color:var(--ink-mid);">' + hk[k] + '</span><span>' + yen(hi.fees[hk[k]]) + '</span></div>';
+      }
+      if (hi.notice) html += '<div style="margin-top:6px;font-size:11px;color:var(--sage);">📢 ' + hi.notice + '</div>';
+      html += '</div></div>';
+    }
+    html += '</div>';
+  }
+
+  document.querySelector('main').innerHTML = html;
+}
+
 // Pull to Refresh
 (function() {
   var THRESHOLD = 120;
@@ -330,7 +433,15 @@ function toggleDetail(id) {
 
         setTimeout(function() {
           container.style.transition = '';
-          window.location.reload();
+          google.script.run
+            .withSuccessHandler(function(data) {
+              if (data) refreshPage(data);
+              refreshing = false;
+            })
+            .withFailureHandler(function() {
+              refreshing = false;
+            })
+            .getInvoiceData(PAGE_TOKEN);
         }, 300);
       }, 400);
     } else {
