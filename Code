@@ -15,11 +15,8 @@ function onOpen() {
     .addItem('📂 xlsmを取込む', 'showImportDialog')
     .addSeparator()
     .addItem('🔗 保護者ページ・兄弟グループ管理', 'showUrls')
-    .addItem('📄 QRコード配布用ドキュメント生成', 'generateHandoutDoc')
     .addSeparator()
     .addItem('⚙️ 初期設定（初回のみ）', 'setup')
-    .addSeparator()
-    .addItem('🔄 マスタデータをリセット', 'resetMasterData')
     .addToUi();
 }
 
@@ -95,6 +92,8 @@ function processImportedData(params) {
 
     var newMasterRows = [];
     var newHistoryRows = [];
+    var importDate = new Date();
+    var existingRowsToUpdate = [];
 
     for (var c = 0; c < params.classes.length; c++) {
       var cls = params.classes[c];
@@ -105,11 +104,12 @@ function processImportedData(params) {
         var token;
         if (masterMap[idStr]) {
           token = masterMap[idStr].token;
+          existingRowsToUpdate.push(masterMap[idStr].rowIndex);
         } else {
           token = generateToken();
           var specialUrl = getWebAppUrl() + '?t=' + token;
           var qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(specialUrl);
-          newMasterRows.push([child.id, child.guardianName, child.name, cls.name, '', token, new Date(), specialUrl, qrUrl]);
+          newMasterRows.push([child.id, child.guardianName, child.name, cls.name, '', token, importDate, specialUrl, qrUrl]);
           masterMap[idStr] = { token: token };
         }
 
@@ -131,6 +131,11 @@ function processImportedData(params) {
     var hData = history.getDataRange().getValues();
     for (var i = hData.length - 1; i >= 1; i--) {
       if (String(hData[i][0]) === String(params.invoiceMonth)) history.deleteRow(i + 1);
+    }
+
+    // 既存園児の登録日をインポート日で更新
+    for (var j = 0; j < existingRowsToUpdate.length; j++) {
+      master.getRange(existingRowsToUpdate[j], 7).setValue(importDate);
     }
 
     // マスタに新規追加
