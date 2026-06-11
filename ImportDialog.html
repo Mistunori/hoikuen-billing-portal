@@ -125,7 +125,7 @@ function startImport() {
           // 有効な園児行の条件: ID列が数値、名前があり、集金額が正数
           if (typeof row[0] !== 'number' || !row[nameIdx]) continue;
           var total = row[totalIdx];
-          if (!total || typeof total !== 'number' || total <= 0) continue;
+          if (total === null || total === undefined || typeof total !== 'number' || total < 0) continue;
 
           var rawName = String(row[nameIdx]).replace(/^●/, '').trim();
           var guardianName = extractSurname(rawName) + ' 様';
@@ -136,7 +136,8 @@ function startImport() {
             if (v && typeof v === 'number' && v > 0) fees[f.name] = v;
           });
 
-          children.push({ id: row[0], name: rawName, guardianName: guardianName, fees: fees, total: total });
+          var childNotice = (total === 0) ? '今月の集金はありません' : '';
+          children.push({ id: row[0], name: rawName, guardianName: guardianName, fees: fees, total: total, notice: childNotice });
         }
 
         if (children.length > 0) classes.push({ name: sheetName, children: children });
