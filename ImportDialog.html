@@ -65,7 +65,6 @@ textarea { height: 60px; resize: vertical; }
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script>
 var selectedFile = null;
-var TARGET_SHEETS = ['ラズベリー', 'ベリー', 'ポピー', 'ミント', 'ミモザ', 'オリーブ'];
 
 var dropZone = document.getElementById('dropZone');
 var fileInput = document.getElementById('fileInput');
@@ -101,7 +100,10 @@ function startImport() {
       var classes = [];
 
       wb.SheetNames.forEach(function(sheetName) {
-        if (TARGET_SHEETS.indexOf(sheetName) < 0) return;
+        // クラスシートかどうかはシート名の固定リストではなく、
+        // 見出し行（2行目）に「名前」「集金額」列があるかで判定する。
+        // → 新しいクラスのシートを追加したり、クラス名を変更しても
+        //   コードを直さずに自動で取り込み対象になる。
         var ws = wb.Sheets[sheetName];
         var rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
         if (rows.length < 3) return;
