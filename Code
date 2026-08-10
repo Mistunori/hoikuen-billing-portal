@@ -104,7 +104,12 @@ function processImportedData(params) {
         var token;
         if (masterMap[idStr]) {
           token = masterMap[idStr].token;
-          existingRowsToUpdate.push(masterMap[idStr].rowIndex);
+          existingRowsToUpdate.push({
+            rowIndex: masterMap[idStr].rowIndex,
+            guardianName: child.guardianName,
+            name: child.name,
+            cls: cls.name
+          });
         } else {
           token = generateToken();
           var specialUrl = getWebAppUrl() + '?t=' + token;
@@ -133,9 +138,11 @@ function processImportedData(params) {
       if (String(hData[i][0]) === String(params.invoiceMonth)) history.deleteRow(i + 1);
     }
 
-    // 既存園児の登録日をインポート日で更新
+    // 既存園児の保護者名・園児名・クラス（進級やクラス名変更を反映）と登録日を更新
     for (var j = 0; j < existingRowsToUpdate.length; j++) {
-      master.getRange(existingRowsToUpdate[j], 7).setValue(importDate);
+      var u = existingRowsToUpdate[j];
+      master.getRange(u.rowIndex, 2, 1, 3).setValues([[u.guardianName, u.name, u.cls]]);
+      master.getRange(u.rowIndex, 7).setValue(importDate);
     }
 
     // マスタに新規追加
