@@ -124,10 +124,11 @@ function startImport() {
         var children = [];
         for (var i = 2; i < rows.length; i++) {
           var row = rows[i];
-          // 有効な園児行の条件: ID列が数値、名前があり、集金額が正数
+          // 有効な園児行の条件: ID列が数値、名前があり、集金額が数値
+          // （還付で集金額がマイナスになる場合も取り込む）
           if (typeof row[0] !== 'number' || !row[nameIdx]) continue;
           var total = row[totalIdx];
-          if (total === null || total === undefined || typeof total !== 'number' || total < 0) continue;
+          if (typeof total !== 'number') continue;
 
           var rawName = String(row[nameIdx]).replace(/^●/, '').trim();
           var guardianName = extractSurname(rawName) + ' 様';
@@ -135,7 +136,8 @@ function startImport() {
           var fees = {};
           feeIdxs.forEach(function(f) {
             var v = row[f.idx];
-            if (v && typeof v === 'number' && v > 0) fees[f.name] = v;
+            // 0円の項目は非表示。マイナス（還付）の項目は表示する
+            if (typeof v === 'number' && v !== 0) fees[f.name] = v;
           });
 
           var childNotice = (total === 0) ? '今月の集金はありません' : '';
